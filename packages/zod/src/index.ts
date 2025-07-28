@@ -1,16 +1,4 @@
-import {
-  ZodObject,
-  input,
-  output,
-  ZodDefault,
-  ZodSchema,
-  ParseParams,
-  ZodIssue,
-  AnyZodObject,
-  ZodArrayDef,
-  ZodArray,
-  ZodFirstPartyTypeKind,
-} from 'zod';
+import { ZodObject, input, output, ZodDefault, ZodSchema, ZodIssue, ZodArray } from 'zod';
 import { PartialDeep } from 'type-fest';
 import { isNotNestedPath, type TypedSchema, type TypedSchemaError, cleanupNonNestedPath } from 'vee-validate';
 import { isIndex, isObject, merge, normalizeFormPath } from '../../shared';
@@ -22,10 +10,10 @@ export function toTypedSchema<
   TSchema extends ZodSchema,
   TOutput = output<TSchema>,
   TInput = PartialDeep<input<TSchema>>,
->(zodSchema: TSchema, opts?: Partial<ParseParams>): TypedSchema<TInput, TOutput> {
+>(zodSchema: TSchema, opts?: any): TypedSchema<TInput, TOutput> {
   const schema: TypedSchema = {
     __type: 'VVTypedSchema',
-    async parse(value) {
+    async parse(value: any) {
       const result = await zodSchema.safeParseAsync(value, opts);
       if (result.success) {
         return {
@@ -41,7 +29,7 @@ export function toTypedSchema<
         errors: Object.values(errors),
       };
     },
-    cast(values) {
+    cast(values: any) {
       try {
         return zodSchema.parse(values);
       } catch {
@@ -54,7 +42,7 @@ export function toTypedSchema<
         return values;
       }
     },
-    describe(path) {
+    describe(path: any) {
       try {
         if (!path) {
           return {
@@ -95,11 +83,19 @@ export function toTypedSchema<
 function processIssues(issues: ZodIssue[], errors: Record<string, TypedSchemaError>): void {
   issues.forEach(issue => {
     const path = normalizeFormPath(issue.path.join('.'));
+
+    // Handle invalid_union errors - in Zod v4, union errors are handled differently
     if (issue.code === 'invalid_union') {
-      processIssues(
-        issue.unionErrors.flatMap(ue => ue.issues),
-        errors,
-      );
+      // In Zod v4, union errors may have unionErrors property
+      if ('unionErrors' in issue) {
+        const unionIssue = issue as any;
+        if (unionIssue.unionErrors) {
+          processIssues(
+            unionIssue.unionErrors.flatMap((ue: any) => ue.issues),
+            errors,
+          );
+        }
+      }
 
       if (!path) {
         return;
@@ -124,7 +120,7 @@ function getDefaults<Schema extends ZodSchema>(schema: Schema): unknown {
   return Object.fromEntries(
     Object.entries(schema.shape).map(([key, value]) => {
       if (value instanceof ZodDefault) {
-        return [key, value._def.defaultValue()];
+        return [key, (value as any)._def.defaultValue()];
       }
 
       if (value instanceof ZodObject) {
@@ -154,7 +150,7 @@ function getSchemaForPath(path: string, schema: ZodSchema): ZodSchema | null {
   }
 
   if (isNotNestedPath(path)) {
-    return schema.shape[cleanupNonNestedPath(path)];
+    return (schema as any).shape[cleanupNonNestedPath(path)];
   }
 
   const paths = (path || '').split(/\.|\[(\d+)\]/).filter(Boolean);
@@ -167,12 +163,13 @@ function getSchemaForPath(path: string, schema: ZodSchema): ZodSchema | null {
     }
 
     if (isObjectSchema(currentSchema)) {
-      currentSchema = currentSchema.shape[p] || null;
+      currentSchema = (currentSchema as any).shape[p] || null;
       continue;
     }
 
     if (isIndex(p) && isArraySchema(currentSchema)) {
-      currentSchema = (currentSchema._def as ZodArrayDef).type;
+      // In Zod v4, the internal structure may have changed
+      currentSchema = (currentSchema as any)._def?.type || (currentSchema as any)._zod?.def?.type || null;
     }
   }
 
@@ -180,13 +177,14 @@ function getSchemaForPath(path: string, schema: ZodSchema): ZodSchema | null {
 }
 
 function getDefType(schema: ZodSchema) {
-  return (schema._def as any).typeName as ZodFirstPartyTypeKind;
+  // In Zod v4, the internal structure has changed
+  return (schema as any)._def?.typeName || (schema as any)._zod?.def?.typeName;
 }
 
-function isArraySchema(schema: ZodSchema): schema is ZodArray<any, any> {
-  return getDefType(schema) === ZodFirstPartyTypeKind.ZodArray;
+function isArraySchema(schema: ZodSchema): schema is ZodArray<any> {
+  return getDefType(schema) === 'ZodArray';
 }
 
-function isObjectSchema(schema: ZodSchema): schema is AnyZodObject {
-  return getDefType(schema) === ZodFirstPartyTypeKind.ZodObject;
+function isObjectSchema(schema: ZodSchema): schema is ZodObject<any> {
+  return getDefType(schema) === 'ZodObject';
 }

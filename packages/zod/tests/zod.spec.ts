@@ -223,8 +223,8 @@ test('handles zod union errors', async () => {
   const wrapper = mountWithHoc({
     setup() {
       const schema = z.object({
-        email: z.string().email({ message: 'valid email' }).min(1, 'Email is required'),
-        name: z.string().min(1, 'Name is required'),
+        email: z.string().email({ error: 'valid email' }).min(1, { error: 'Email is required' }),
+        name: z.string().min(1, { error: 'Name is required' }),
       });
 
       const schemaBothUndefined = z.object({

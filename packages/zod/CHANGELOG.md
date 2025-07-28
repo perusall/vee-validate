@@ -1,5 +1,27 @@
 # Change Log
 
+## 4.15.2
+
+### Major Changes
+
+- **BREAKING**: Upgraded to Zod v4 compatibility
+  - Updated peer dependency from `^3.24.0` to `^4.0.0`
+  - Removed deprecated imports: `ParseParams`, `AnyZodObject`, `ZodArrayDef`, `ZodFirstPartyTypeKind`
+  - Updated error handling to use new Zod v4 APIs
+  - Updated type checking to use string literals instead of enum values
+  - Fixed union error handling for Zod v4 compatibility
+  - Updated internal property access to handle Zod v4's new structure (`_zod.def` vs `_def`)
+  - Enhanced error processing to handle new issue formats
+  - Added support for new top-level string validators (`z.email()`, `z.uuid()`, `z.url()`, etc.)
+  - Improved record type handling with enum support
+  - Added comprehensive test coverage for Zod v4 features
+
+### Patch Changes
+
+- Updated dependencies [721e980]
+- Updated dependencies [546d82e]
+  - vee-validate@4.15.1
+
 ## 4.15.1
 
 ### Patch Changes
